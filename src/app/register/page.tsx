@@ -1,7 +1,188 @@
-import React from 'react';
+'use client';
 
-const page = () => {
-  return <div>page</div>;
-};
+import type React from 'react';
 
-export default page;
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FcGoogle } from 'react-icons/fc';
+
+export default function RegisterPage() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+
+      // Sign in the user after successful registration
+      const result = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
+      });
+
+      if (result?.error) {
+        setError(result.error);
+        setIsLoading(false);
+        return;
+      }
+
+      router.push('/dashboard');
+      router.refresh();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Registration failed:', error);
+        setError(error.message || 'Registration failed. Please try again.');
+      } else {
+        console.error('An unexpected error occurred:', error);
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = () => {
+    signIn('google', { callbackUrl: '/dashboard' });
+  };
+
+  return (
+    <div className='container flex h-screen items-center justify-center'>
+      <Card className='mx-auto max-w-sm'>
+        <CardHeader className='space-y-1'>
+          <CardTitle className='text-2xl font-bold'>
+            Create an account
+          </CardTitle>
+          <CardDescription>
+            Enter your information to create an account
+          </CardDescription>
+        </CardHeader>
+        {error && (
+          <div className='px-6'>
+            <Alert variant='destructive'>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </div>
+        )}
+        <form onSubmit={handleSubmit}>
+          <CardContent className='space-y-4'>
+            <div className='space-y-2'>
+              <Label htmlFor='name'>Name</Label>
+              <Input
+                id='name'
+                placeholder='John Doe'
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='email'>Email</Label>
+              <Input
+                id='email'
+                type='email'
+                placeholder='m@example.com'
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='password'>Password</Label>
+              <Input
+                id='password'
+                type='password'
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='confirm-password'>Confirm Password</Label>
+              <Input
+                id='confirm-password'
+                type='password'
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type='submit' className='w-full' disabled={isLoading}>
+              {isLoading ? 'Creating account...' : 'Create account'}
+            </Button>
+            <div className='relative'>
+              <div className='absolute inset-0 flex items-center'>
+                <span className='w-full border-t' />
+              </div>
+              <div className='relative flex justify-center text-xs uppercase'>
+                <span className='bg-background px-2 text-muted-foreground'>
+                  Or continue with
+                </span>
+              </div>
+            </div>
+            <Button
+              type='button'
+              variant='outline'
+              className='w-full'
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+            >
+              <FcGoogle className='mr-2 h-4 w-4' />
+              Google
+            </Button>
+          </CardContent>
+          <CardFooter className='flex flex-col'>
+            <p className='mt-2 text-center text-sm text-muted-foreground'>
+              Already have an account?{' '}
+              <Link
+                href='/login'
+                className='text-primary underline-offset-4 hover:underline'
+              >
+                Login
+              </Link>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  );
+}
